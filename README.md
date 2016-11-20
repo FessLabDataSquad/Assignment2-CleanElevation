@@ -4,27 +4,27 @@ Here are various ways this script could be improved.
 
 ##1. Eliminate manual steps
 
-a. See section "Data preparation in spreadsheet software" -- all of these simple operations could be done in R instead.
-b. Success with (1a) would help address a minor problem discussed in the "Finishing time" section -- Excel was cutting off time data at minutes, even when seconds were available. That's not a huge deal in this project, but it is a bit sloppy and cleaning it up would be good.
-c. See section "Load data" -- I am not consistent in how I modify and use variable names. Develop best practice for this and implement it here.
+###a. See section "Data preparation in spreadsheet software" -- all of these simple operations could be done in R instead.
+###b. Success with (1a) would help address a minor problem discussed in the "Finishing time" section -- Excel was cutting off time data at minutes, even when seconds were available. That's not a huge deal in this project, but it is a bit sloppy and cleaning it up would be good.
+###c. See section "Load data" -- I am not consistent in how I modify and use variable names. Develop best practice for this and implement it here.
 
 
 ##2. Brute force vs. efficiency
 
 In many cases, I've done things the hard way instead of the smart way. Any time you see a lot of lines that all look very similar, just with one or two parameters changed, that's probably an opportunity to improve efficiency.
 
-a. See the "Condensing variables" section, especially Studies 3 & 4.
-b. Reverse-scoring could be more efficient with a list of variables and a custom function
-c. Education section probably could be more efficient with custom function
+###a. See the "Condensing variables" section, especially Studies 3 & 4.
+###b. Reverse-scoring could be more efficient with a list of variables and a custom function
+###c. Education section probably could be more efficient with custom function
 
 
 ##3. Magic numbers
 
 Generally, instead of hard-coding specific numeric values, it is preferable to create a descriptive variable name and assign it the numeric value. 
 
-a. The reverse-scoring section: set something like ''' SCALE_MAX = 7 ; REVERSE_VALUE = SCALE_MAX + 1" and then make a custom function to apply to the relevant list of variables (see 2b)
-b. This issue may or may not be useful for the section about "Playback problems"
-c. Other places?
+###a. The reverse-scoring section: set something like ''' SCALE_MAX = 7 ; REVERSE_VALUE = SCALE_MAX + 1" and then make a custom function to apply to the relevant list of variables (see 2b)
+###b. This issue may or may not be useful for the section about "Playback problems"
+###c. Other places?
 
 
 ##4. Excluding cases
