@@ -1,7 +1,7 @@
 ---
 title: "Elevation Data Cleaning"
 author: "Adam Sparks"
-date: "Nov 20 2016"
+date: "Jan 31, 2017"
 output: html_document
 ---
 
@@ -13,14 +13,14 @@ This document is built using RMarkdown with R version
 `r getRversion()`.
 
 ## Specific Goal
-This is the data cleaning script for Fessler, Sparks, Pisor and Holbrook (in prep). 
+This is the data cleaning script for Fessler, Sparks, Pisor and Holbrook (in prep). The current version does the job, but it includes notes for Data Squad (search #DS) in places where the code could be improved, mostly by using packages and/or custom functions for efficiency.
 
 ## Project ID
 Study labels are different in various places. On OSF, they're here https://osf.io/qb4n9/ as Studies 1, 2, 4, 5 (with LA pilot field study as #3)
 
 #Data Cleaning
 ## Data preparation in spreadsheet software
-I did some data preparation in spreadsheet software for expedience. This sacrifices replicability. Should redo all of this in R.
+I did some data preparation in spreadsheet software for expedience.
 
 ###study 1
 - Delete unused columns
@@ -53,14 +53,33 @@ study4 = read.csv("study4_rawdata.csv", header = TRUE)
 
 #Been moving towards giving each study a separate variable names file, but not complete. Some of this work was done in excel.
 
-variables_study4 = read.csv("study4_variablenames.csv", header = FALSE)
-names(study4) = variables_study4[, 1] #use short names for now; column 2 has the full items if i need them later
+#DS could redo excel work in R. A better way to redo variable names would be the most important place to start.
 
-#these studies include ratings collected separately
+variables_study4 = read.csv("study4_variablenames.csv", header = FALSE)
+names(study4) = variables_study4[, 1] #use short names for now because the full items are too long; column 2 has the full items if i need them later
+
+#The free responses provided by participants were coded by research assistancts for friendliness, helpfulness, etc. Below we import those ratings.
+
+## from round X 
 study1 = merge (study1, read.csv("study1_helpfulness.csv"), by = "Response.ID")
 study2 = merge (study2, read.csv("study2_helpfulness.csv"), by = "Response.ID")
 study3 = merge (study3, read.csv("study3_helpfulness.csv"), by = "Response.ID")
 study4 = merge (study4, read.csv("study4_helpfulness.csv"), by = "Response.ID")
+
+## from round Y
+# need to insert these
+
+## from round Z -- Dec 2016
+study1 = merge (study1, read.csv("study1_friendliness.csv", header=T, col.names=c("Response.ID","friendliness")), by = "Response.ID", all.x=T)
+study2 = merge (study2, read.csv("study2_friendliness.csv", header=T, col.names=c("Response.ID","friendliness")), by = "Response.ID", all.x=T)
+study3 = merge (study3, read.csv("study3_friendliness.csv", header=T, col.names=c("Response.ID","friendliness")), by = "Response.ID", all.x=T)
+study4 = merge (study4, read.csv("study4_friendliness.csv", header=T, col.names=c("Response.ID","friendliness")), by = "Response.ID", all.x=T)
+
+study1 = merge (study1, read.csv("study1_taskperformance.csv", header=T, col.names=c("Response.ID","taskperformance")), by = "Response.ID", all.x=T)
+study2 = merge (study2, read.csv("study2_taskperformance.csv", header=T, col.names=c("Response.ID","taskperformance")), by = "Response.ID", all.x=T)
+study3 = merge (study3, read.csv("study3_taskperformance.csv", header=T, col.names=c("Response.ID","taskperformance")), by = "Response.ID", all.x=T)
+study4 = merge (study4, read.csv("study4_taskperformance.csv", header=T, col.names=c("Response.ID","taskperformance")), by = "Response.ID", all.x=T)
+
 
 # starting sample size
 starting_sample = list(
@@ -76,7 +95,7 @@ The variables for studies 1 and 2 were nearly identical, with only a few DVs dif
 Studies 3 & 4 have many more items because of the repeated measures aspect of the designs.
 
 ### Identifying conditions
-Here I make sure each study includes descriptive text factors as "condition"" and binary identifiers of the prosocial conditions as "prosocial_condition". Other condition codes included as needed.
+The goal here is for some key variable names to be consistent across each study. A character vector called "condition" keeps the text names for the condition. A binary factor "prosocial_condition" will always be 1 for the elevation/prosocial/Thai condition and 0 for control. Other condition codes (e.g. order A, order B) included as needed.
 
 ####study 1
 study 1 was a 2x2 design with cells:  
@@ -87,7 +106,7 @@ study1$condition=as.factor(strtrim(study1$branch, 6))
 levels(study1$condition)
 study1$prosocial_condition = ifelse(study1$condition=="Elevat", 1, ifelse(study1$condition=="Contro", 0, NA))
 
-study1$optin=as.numeric(grepl("Opt-in", study1$branch))
+study1$optin_condition=as.numeric(grepl("Opt-in", study1$branch))
 ```
 
 ####study 2
@@ -114,27 +133,55 @@ study4$orderA =  ifelse(study4$order=="A1 B2", 1, ifelse(study4$order=="B1 A2", 
 ```
 
 ### Condensing variables
-Sometimes my SurveyGizmo set up requires the same question to be reported in more than one column (e.g. because of branching). In this section I condense those into a single variable.
+Sometimes my SurveyGizmo set up requires the same question to be reported in more than one column (e.g. because of branching), such that every participant has a value in one of those columns and NA in the other. In this section I condense those into a single variable.
 
-*I bet some package has a better way to do this.*
+```
+#DS - Several things in this section could be improved. I suspect that the tidyr package has functions that would make this stuff easier.
+```
 
 ####study 1
-The "opt-in" vs. "opt-out" framings presented basically the same charitable donation question.
+The "opt-in" vs. "opt-out" framings presented slightly different versions of basically the same charitable donation question. Instead of the current reporting where each P has a value for one and NA for the other, put all of the values into one variable, and then have the version type in another variable.
 
 ```{r}
-study1$charity=rowMeans(study1[,c("optin","optout")],na.rm=TRUE) # this is goofy but it works
+study1$charity=rowMeans(study1[,c("optin","optout")],na.rm=TRUE) #one value is NA, other has a numeric value. rowMeans just picks the numeric (because it takes mean of the only numeric value). There's probably a function better designed for this task, but rowMeans does get the job done.
 ```
 
 #### study 3
-Identical tems were presented before and/or after the manipulation.
+Identical items were presented before and/or after the manipulation.
 
 For example, the variables "a.honest.pre" and "a.honest.post" refer to the same attitude scale item (hence "a.xxxxxxx") and whether it was asked pre- or post-manipulation. It was asked before the manipulation in order A, after in order B. I just want one variable "a.honest" and use variable "order" to separate pre-/post-manipulation when needed. The code below condenses all relevant variables.
 
-*I'm not sure that this is the best way to proceed, from the perspective of data structure, but I'm going ahead for now. I'm probably choosing brute force over efficiency, but maybe the efficient solution will emerge.*
+```
+#DS - This is another section where I've used brute force to get the job done, but some package(s) and/or cleverly nested functions could certainly simplify the shit out of this. (Also note that the naming of the variables is crucial to this operation. Changing the naming scheme to make this step easier is an option to consider.) 
 
-*More importantly, there's probably some text-function based way (package "stringr" ?) to simplify the shit out of this--this monstrosity is another instance of using brute force over efficiency for now.*
+#Anne suggests something along these lines:
 
-*I bet some package makes this simpler. {tidyR} maybe?*
+
+nm<-c("a.honest","a.malicious")
+new.cols<-data.frame(matrix(c(rep(NA,nrow(study3)*length(nm))),ncol=length(nm),byrow=FALSE))
+names(new.cols)<-nm
+for (i in 1:length(nm)){
+focal<-nm[i]
+new.cols[i]<-ifelse(study3$order=="A", study3[,paste0(focal,".pre")],study3[,paste0(focal,".post")])
+}
+
+#DS -- Anne further suggests: 
+#If you wanted to get fancy, you could make your nm vector include ALL the column names and run through both A and B here (for a., at least, but in theory easy enough to do for e. etc by including them in the nm vector and adding a single line for each order="" combo), i.e.,
+
+
+for (i in 1:length(nm)){
+focal<-nm[i]
+new.cols[i]<-ifelse(study3$order=="B", study3[,paste0(focal,".pre")],study3[,paste0(focal,".post")]
+new.cols[i]<-ifelse(study3$order=="1", study3[,paste0(focal,".pre")],study3[,paste0(focal,".post")]
+}
+
+#To constrain the prefix to be what you expect, just in case, you could add a bit to the first argument of ifelse:
+new.cols[i]<-ifelse(study3[,grep("^a\\.",nm)]$order=="B", study3[,paste0(focal,".pre")],study3[,paste0(focal,".post")] #gives only strings that begin with a.
+new.cols[i]<-ifelse(study3[,grep("^e\\.",nm)]$order=="A", study3[,paste0(focal,".pre")],study3[,paste0(focal,".post")] #gives only strings that begin with e.
+
+#AP: As a disclaimer, I'm not a coder who maximizes on elegance, though I do attempt to maximize efficiency :). This is my first known exposure to tidyr, and yes, it looks like gather would do what you want. From my known packages, I would have tried melting and casting in reshape2 first, but on second look, tidyr is probably easier for this use.
+```
+
 
 ```{r}
 #Attitude: In block A, before the video. After in block B. (attitude.preA.postB)
@@ -248,7 +295,10 @@ study4$a.caremore = ifelse(study4$orderA=="0", study4$a.caremore.pre,study4$a.ca
 
 ### Reverse-scoring
 Many analyses are more convenient if elevation/idealism/prosociality is higher. The reverse-scoring code below could be improved by (1) avoiding magic numbers, i.e. set something like SCALE_MAX=8 to use, (2) make a list of items and then apply the reverse function to that list, instead of repeating everything.
-
+```
+#AP: upvote to both (1) and (2). An extrapolation of the loop laid out above could be used for (2). For (1), reverse.code from psych is a useful function for this, if you don't mind pulling in a package just to do one job. For the maxi argument to reverse.code, you could literally just say maxi=max(study1$a.dishonest)... or, if extrapolating from the above loop, maxi=max(study3[,focal]).
+#DS Anne's suggestion to redo this using the psych package's reverse.code() is a great idea.
+```
 
 ####study 1
 ```{r}
@@ -326,7 +376,7 @@ study2$height= (12*study2$feet) + study2$inches
 study3$height= (12*study3$feet) + study3$inches
 study4$height= (12*study4$feet) + study4$inches
 
-study3$height[study3$height==48]=NA #extreme value
+study3$height[study3$height==48]=NA #extreme value. probably a typo. We just take out this data point for this participant, but keep other data.
 
 study1$height_z = scale(study1$height, center=T, scale=T)
 study2$height_z = scale(study2$height, center=T, scale=T)
@@ -337,8 +387,8 @@ study4$height_z = scale(study4$height, center=T, scale=T)
 #### Age
 Here I fix some presumed input errors and create a z-scored age for use in regressions.
 ```{r}
-study1$age[study1$age==300]=NA #extreme value
-study2$age[study2$age==2]=NA #extreme value
+study1$age[study1$age==300]=NA #extreme value. probably a typo. We just take out this data point for this participant, but keep other data.
+study2$age[study2$age==2]=NA #extreme value. probably a typo. We just take out this data point for this participant, but keep other data.
 
 study1$age_z = scale(study1$age, center=T, scale=T)
 study2$age_z = scale(study2$age, center=T, scale=T)
@@ -420,11 +470,16 @@ study4$income_z=as.numeric(scale(study4$income,scale=TRUE,center=TRUE))
 ####Education
 In each case I condense response codes 1 and 2 into "high school or less" and 6, 7, and 8 into "some grad school or more" to make the categories more balanced.
 
-*There must be some way to condense this. Custom function?*
+```
+#DS: 
+*There must be some way to condense this. Custom function?* 
+
+#Anne suggests: https://susanejohnston.wordpress.com/2012/10/01/find-and-replace-in-r-part-2-how-to-recode-many-values-simultaneously/. See comments section for an example of how to do it with lapply. I usually write it out, but it's usually just variable from one data set I'm converting, not four!
+```
 
 ```{r}
 study1$hs_less = as.numeric(study1$education < 3)
-study1$some_college = as.numeric(study1$education == "3")
+study1$some_college = as.numeric(study1$education == "3") #AP: You don't need quotes here. Education is numeric.
 study1$AA = as.numeric(study1$education == "4")
 study1$BA = as.numeric(study1$education == "5")
 study1$grad_school = as.numeric(study1$education > 5)
@@ -439,7 +494,7 @@ study3$hs_less = as.numeric(study3$education < 3)
 study3$some_college = as.numeric(study3$education == "3")
 study3$AA = as.numeric(study3$education == "4")
 study3$BA = as.numeric(study3$education == "5")
-study3$grad_school = as.numeric(study3$education > 5)
+study3$grad_school = as.numeric(study3$education > 5) 
 
 study4$hs_less = as.numeric(study4$education < 3)
 study4$some_college = as.numeric(study4$education == "3")
@@ -464,7 +519,7 @@ The reported number of pregnancies was small, so this variable is ignored.
 ### Examine information relevant to potential exclusions
 
 #### Finishing time
-Here we look at information to held set thresholsd for minimum acceptible time, which inevitably is somewhat arbitrary. In most conditions (expection: study 1 Control) participants had to watch a 3 minute video. Thresholds are intended to include people who watch the full video and finish the other questions in a reasonable amount of time.
+In most conditions (expection: study 1 Control) participants had to watch a 3 minute video. Thresholds are intended to include people who watch the full video and finish the other questions in a reasonable amount of time. In addition to the time of the video itself, studies 1 & 2 requires at minimum another 2 minutes to finish all questions, study 3 would requires 3 more minutes, and study 4 requires 3.5 more. Later we implement those cutoffs. Here we visualize the finishing times of each study to see how much of the fast "tail" we cut off.
 
 ```{r}
 library(lubridate)
@@ -477,11 +532,9 @@ study4$time=as.numeric(difftime(ymd_hms(study4$Date.Submitted), ymd_hms(study4$T
 table(study1$time, by=study1$condition)
 table(study2$time)
 table(study3$time)
-hist(study4$time, breaks=500)
+hist(study4$time, breaks=500, xaxp=c(0,50,10))
+
 ``` 
-
-The distributions of responses above suggest that studies 1 & 2 would require at minimum another 2 minutes to finish all questions, Study 3 would require 3 more minutes, study 4 requires 3.5 more. These seem intuitively reasonable, so later I will implement those cutoffs.
-
 
 #### Playback problems
 ##### study 1
@@ -494,7 +547,7 @@ as.character(subset(study2, study2$playback==2)$playback.problems)
 ```
 Based on those descriptions, I judge that none of these cases need to be eliminated. "Major problems" were reported by `r length(subset(study2$playback, study2$playback==3))` participants. They described them:
 ```{r}
-as.character(subset(study2, study2$playback==3)$playback.problems)
+as.character(subset(study2, study2$playback==3)$playback.problems) #AP: only one... not bad!
 ```
 Based on these descriptions, I judge that all these cases should be eliminated.
 
@@ -515,7 +568,8 @@ Based on these descriptions, I judge that all these cases should be eliminated.
 #study3$Response.ID = as.character(study3$Response.ID)
 #study3$Response.ID = droplevels(study3$Response.ID)
 ```
-
+#AP: I'm not able to recreate the error, but I understand why it's likely happening. Using which can often help get rid of issues where NAs are accidenally pulled, e.g.:
+study4[which(study4$playback==3),]$playback.problems
 
 ```{r include=FALSE}
 #There might be slight trends towards less missing data and less quick finishing in thai condition.
